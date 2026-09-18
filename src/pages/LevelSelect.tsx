@@ -37,22 +37,22 @@ export default function LevelSelect() {
     {
       id: 'hundreds',
       title: 'Hundreds Quest',
-      subtitle: '100 - 500',
+      subtitle: '101 - 500',
       description: 'Discover the hundreds!',
       icon: BookOpen,
       color: 'from-green-400 to-emerald-500',
       bgColor: 'bg-green-50',
-      range: '100-500'
+      range: '101-500'
     },
     {
       id: 'thousands',
       title: 'Big Numbers',
-      subtitle: '500 - 1000',
+      subtitle: '501 - 1000',
       description: 'Conquer numbers to 1000!',
       icon: Trophy,
       color: 'from-amber-400 to-orange-500',
       bgColor: 'bg-amber-50',
-      range: '500-1000'
+      range: '501-1000'
     }
   ];
 

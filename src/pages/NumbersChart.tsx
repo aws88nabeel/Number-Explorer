@@ -120,8 +120,8 @@ export default function NumbersChart() {
     foundation: { start: 1, end: 10, perPage: 10, title: 'Number Friends (1-10)', color: 'pink' },
     teens: { start: 11, end: 20, perPage: 10, title: 'Teen Adventures (11-20)', color: 'purple' },
     tens: { start: 1, end: 100, perPage: 100, title: 'Tens Journey (1-100)', color: 'blue' },
-    hundreds: { start: 100, end: 500, perPage: 100, title: 'Hundreds Quest (100-500)', color: 'green' },
-    thousands: { start: 500, end: 1000, perPage: 100, title: 'Big Numbers (500-1000)', color: 'amber' },
+    hundreds: { start: 101, end: 500, perPage: 100, title: 'Hundreds Quest (101-500)', color: 'green' },
+    thousands: { start: 501, end: 1000, perPage: 100, title: 'Big Numbers (501-1000)', color: 'amber' },
   };
 
   const config = levelConfig[level as keyof typeof levelConfig] || levelConfig.foundation;
