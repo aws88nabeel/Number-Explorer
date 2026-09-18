@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Sparkles, Star, Trophy, BookOpen, Calculator, Target } from 'lucide-react';
+import { Sparkles, Star, Trophy, BookOpen, Calculator, Target, Puzzle } from 'lucide-react';
 
 export default function LevelSelect() {
   const levels = [
@@ -12,7 +12,8 @@ export default function LevelSelect() {
       icon: Star,
       color: 'from-pink-400 to-rose-500',
       bgColor: 'bg-pink-50',
-      range: '1-10'
+      range: '1-10',
+      path: '/chart/foundation'
     },
     {
       id: 'teens',
@@ -22,7 +23,8 @@ export default function LevelSelect() {
       icon: Sparkles,
       color: 'from-purple-400 to-violet-500',
       bgColor: 'bg-purple-50',
-      range: '11-20'
+      range: '11-20',
+      path: '/chart/teens'
     },
     {
       id: 'tens',
@@ -32,7 +34,8 @@ export default function LevelSelect() {
       icon: Calculator,
       color: 'from-blue-400 to-cyan-500',
       bgColor: 'bg-blue-50',
-      range: '1-100'
+      range: '1-100',
+      path: '/chart/tens'
     },
     {
       id: 'hundreds',
@@ -42,7 +45,8 @@ export default function LevelSelect() {
       icon: BookOpen,
       color: 'from-green-400 to-emerald-500',
       bgColor: 'bg-green-50',
-      range: '101-500'
+      range: '101-500',
+      path: '/chart/hundreds'
     },
     {
       id: 'thousands',
@@ -52,7 +56,19 @@ export default function LevelSelect() {
       icon: Trophy,
       color: 'from-amber-400 to-orange-500',
       bgColor: 'bg-amber-50',
-      range: '501-1000'
+      range: '501-1000',
+      path: '/chart/thousands'
+    },
+    {
+      id: 'puzzle',
+      title: 'Number Cross Puzzle',
+      subtitle: 'Game',
+      description: 'Fill in the missing numbers around the center!',
+      icon: Puzzle,
+      color: 'from-cyan-400 to-blue-500',
+      bgColor: 'bg-cyan-50',
+      range: 'Game',
+      path: '/puzzle'
     }
   ];
 
@@ -145,7 +161,7 @@ export default function LevelSelect() {
               className="perspective-1000"
             >
               <Link
-                to={`/chart/${level.id}`}
+                to={level.path}
                 className={`block ${level.bgColor} rounded-3xl p-6 shadow-xl border-2 border-white/50 transform-gpu transition-all duration-300`}
                 style={{ transformStyle: 'preserve-3d' }}
               >
