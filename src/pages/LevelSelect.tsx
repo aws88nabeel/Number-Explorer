@@ -63,7 +63,7 @@ export default function LevelSelect() {
       id: 'puzzle',
       title: 'Number Shape Puzzle',
       subtitle: 'Letters A-Z & Cross',
-      description: 'Fill letter-shaped grids with numbers using chart patterns!',
+      description: 'Fill letter shapes with numbers!',
       icon: Puzzle,
       color: 'from-cyan-400 to-blue-500',
       bgColor: 'bg-cyan-50',
@@ -158,21 +158,21 @@ export default function LevelSelect() {
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
               }}
               whileTap={{ scale: 0.98 }}
-              className="perspective-1000"
+              className="perspective-1000 h-full"
             >
               <Link
                 to={level.path}
-                className={`block ${level.bgColor} rounded-3xl p-6 shadow-xl border-2 border-white/50 transform-gpu transition-all duration-300`}
+                className={`flex flex-col h-full ${level.bgColor} rounded-3xl p-6 shadow-xl border-2 border-white/50 transform-gpu transition-all duration-300`}
                 style={{ transformStyle: 'preserve-3d' }}
               >
                 {/* 3D Card effect */}
-                <div className="relative">
+                <div className="relative flex flex-col flex-1">
                   {/* Glow effect */}
                   <div className={`absolute inset-0 bg-gradient-to-r ${level.color} opacity-0 rounded-3xl blur-xl transition-opacity duration-300 group-hover:opacity-30`} />
                   
                   <div className="flex items-start gap-4">
                     <motion.div
-                      className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${level.color} flex items-center justify-center shadow-lg`}
+                      className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${level.color} flex items-center justify-center shadow-lg shrink-0`}
                       whileHover={{ rotate: [0, -10, 10, 0] }}
                       transition={{ duration: 0.5 }}
                       style={{ transform: 'translateZ(20px)' }}
@@ -187,7 +187,7 @@ export default function LevelSelect() {
                     </div>
                   </div>
                   
-                  <p className="mt-4 text-gray-600 text-sm md:text-base">
+                  <p className="mt-4 text-gray-600 text-sm md:text-base flex-1">
                     {level.description}
                   </p>
                   
