@@ -13,7 +13,7 @@ An immersive, interactive 3D numbers chart designed to help young learners under
 
 Number Explorer is a visually engaging educational application that helps children master number recognition, counting, and numerical patterns. Through interactive 3D-styled number blocks, audio pronunciation, and pattern discovery modes, children can explore numbers from 1 to 1000 in a playful, intuitive environment.
 
-Online Game : [https://number-explorer-grjg.arcada.app](https://kn3g8e-pacucjl7h-arcadawebapps6.vercel.app/) 
+Online Game : https://kn3g8e-pacucjl7h-arcadawebapps6.vercel.app/
 ---
 
 ## ✨ Features
