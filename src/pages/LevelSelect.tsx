@@ -63,7 +63,7 @@ export default function LevelSelect() {
       id: 'puzzle',
       title: 'Number Shape Puzzle',
       subtitle: 'Letters A-Z & Cross',
-      description: 'Fill letter shapes with numbers!',
+      description: 'Fill letters with numbers!',
       icon: Puzzle,
       color: 'from-cyan-400 to-blue-500',
       bgColor: 'bg-cyan-50',
