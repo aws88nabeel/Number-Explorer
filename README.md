@@ -15,6 +15,10 @@ Number Explorer is a visually engaging educational application that helps childr
 
 ---
 
+## 💻 Online
+
+https://kn3g8e-pacucjl7h-arcadawebapps6.vercel.app 
+
 ## ✨ Features
 
 ### 📚 Progressive Learning Levels
