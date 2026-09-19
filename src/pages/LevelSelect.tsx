@@ -61,9 +61,9 @@ export default function LevelSelect() {
     },
     {
       id: 'puzzle',
-      title: 'Number Cross Puzzle',
-      subtitle: 'Game',
-      description: 'Fill in the missing numbers around the center!',
+      title: 'Number Shape Puzzle',
+      subtitle: 'Letters A-Z & Cross',
+      description: 'Fill letter-shaped grids with numbers using chart patterns!',
       icon: Puzzle,
       color: 'from-cyan-400 to-blue-500',
       bgColor: 'bg-cyan-50',

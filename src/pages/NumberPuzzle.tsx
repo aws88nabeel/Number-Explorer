@@ -1,16 +1,44 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Volume2, VolumeX, RefreshCw, Star, Trophy, Lightbulb,
-  Check, X, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Puzzle as PuzzleIcon
+  Check, X, Puzzle as PuzzleIcon, Shuffle
 } from 'lucide-react';
 
-type Direction = 'up' | 'down' | 'left' | 'right';
+// 5-wide x 7-tall dot-matrix bitmaps for letters, plus a 3x3 "+" cross shape.
+// '1' = part of the shape (fillable/given cell), '0' = empty space.
+const LETTER_SHAPES: Record<string, string[]> = {
+  CROSS: ['010', '111', '010'],
+  A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
+  B: ['11110', '10001', '10001', '11110', '10001', '10001', '11110'],
+  C: ['01110', '10001', '10000', '10000', '10000', '10001', '01110'],
+  D: ['11110', '10001', '10001', '10001', '10001', '10001', '11110'],
+  E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+  F: ['11111', '10000', '10000', '11110', '10000', '10000', '10000'],
+  G: ['01110', '10001', '10000', '10111', '10001', '10001', '01110'],
+  H: ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
+  I: ['11111', '00100', '00100', '00100', '00100', '00100', '11111'],
+  J: ['00111', '00010', '00010', '00010', '10010', '10010', '01100'],
+  K: ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
+  L: ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
+  M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
+  N: ['10001', '11001', '10101', '10101', '10011', '10001', '10001'],
+  O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
+  P: ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
+  Q: ['01110', '10001', '10001', '10001', '10101', '10010', '01101'],
+  R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
+  S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
+  T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
+  U: ['10001', '10001', '10001', '10001', '10001', '10001', '01110'],
+  V: ['10001', '10001', '10001', '10001', '01010', '01010', '00100'],
+  W: ['10001', '10001', '10001', '10101', '10101', '11011', '10001'],
+  X: ['10001', '01010', '00100', '00100', '00100', '01010', '10001'],
+  Y: ['10001', '01010', '00100', '00100', '00100', '00100', '00100'],
+  Z: ['11111', '00001', '00010', '00100', '01000', '10000', '11111'],
+};
 
-interface CellResult {
-  status: 'empty' | 'correct' | 'wrong';
-}
+const shapeOrder = ['H', 'CROSS', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
 const blocks = [
   { label: '1 - 100', start: 1, end: 100, color: 'from-pink-400 to-rose-500' },
@@ -25,22 +53,61 @@ const blocks = [
   { label: '901 - 1000', start: 901, end: 1000, color: 'from-indigo-400 to-blue-600' },
 ];
 
-function randomCenter(blockStart: number, blockEnd: number): number {
-  // Keep a safe margin so up(-10), down(+10), left(-1), right(+1) all stay within 1..1000
-  const safeMin = Math.max(blockStart, 11);
-  const safeMax = Math.min(blockEnd, 990);
-  const lo = Math.min(safeMin, safeMax);
-  const hi = Math.max(safeMin, safeMax);
-  return Math.floor(Math.random() * (hi - lo + 1)) + lo;
+interface Cell { r: number; c: number; }
+interface PuzzleData {
+  bitmap: string[];
+  rows: number;
+  cols: number;
+  givenKey: string;
+  values: Record<string, number>;
+  onKeys: string[];
+}
+
+function buildPuzzle(shapeId: string, blockIdx: number): PuzzleData {
+  const bitmap = LETTER_SHAPES[shapeId];
+  const rows = bitmap.length;
+  const cols = bitmap[0].length;
+  const onCells: Cell[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (bitmap[r][c] === '1') onCells.push({ r, c });
+    }
+  }
+  const given = onCells[0];
+  const offsets = onCells.map(cell => ({
+    key: `${cell.r}-${cell.c}`,
+    off: (cell.r - given.r) * 10 + (cell.c - given.c),
+  }));
+  const minOff = Math.min(...offsets.map(o => o.off));
+  const maxOff = Math.max(...offsets.map(o => o.off));
+
+  const lowBound = Math.max(1 - minOff, 1);
+  const highBound = Math.min(999 - maxOff, 999);
+  const block = blocks[blockIdx];
+  let lo = Math.max(lowBound, block.start);
+  let hi = Math.min(highBound, block.end);
+  if (lo > hi) { lo = lowBound; hi = highBound; }
+  const start = Math.floor(Math.random() * (hi - lo + 1)) + lo;
+
+  const values: Record<string, number> = {};
+  offsets.forEach(o => { values[o.key] = start + o.off; });
+
+  return {
+    bitmap,
+    rows,
+    cols,
+    givenKey: `${given.r}-${given.c}`,
+    values,
+    onKeys: onCells.map(c => `${c.r}-${c.c}`),
+  };
 }
 
 export default function NumberPuzzle() {
+  const [shapeId, setShapeId] = useState('H');
   const [blockIndex, setBlockIndex] = useState(0);
-  const [center, setCenter] = useState(() => randomCenter(blocks[0].start, blocks[0].end));
-  const [inputs, setInputs] = useState<Record<Direction, string>>({ up: '', down: '', left: '', right: '' });
-  const [results, setResults] = useState<Record<Direction, CellResult>>({
-    up: { status: 'empty' }, down: { status: 'empty' }, left: { status: 'empty' }, right: { status: 'empty' }
-  });
+  const [puzzle, setPuzzle] = useState<PuzzleData>(() => buildPuzzle('H', 0));
+  const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [results, setResults] = useState<Record<string, 'empty' | 'correct' | 'wrong'>>({});
   const [checked, setChecked] = useState(false);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -48,15 +115,6 @@ export default function NumberPuzzle() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showHint, setShowHint] = useState(false);
-
-  const inputRefs = useRef<Record<Direction, HTMLInputElement | null>>({ up: null, down: null, left: null, right: null });
-
-  const answers: Record<Direction, number> = {
-    up: center - 10,
-    down: center + 10,
-    left: center - 1,
-    right: center + 1,
-  };
 
   const speak = useCallback((text: string) => {
     if (!soundEnabled || !('speechSynthesis' in window)) return;
@@ -66,44 +124,52 @@ export default function NumberPuzzle() {
     speechSynthesis.speak(utterance);
   }, [soundEnabled]);
 
-  const newPuzzle = useCallback((idx?: number) => {
-    const bi = idx ?? blockIndex;
-    const block = blocks[bi];
-    setCenter(randomCenter(block.start, block.end));
-    setInputs({ up: '', down: '', left: '', right: '' });
-    setResults({ up: { status: 'empty' }, down: { status: 'empty' }, left: { status: 'empty' }, right: { status: 'empty' } });
+  const newPuzzle = useCallback((sId?: string, bIdx?: number) => {
+    const sid = sId ?? shapeId;
+    const bidx = bIdx ?? blockIndex;
+    const p = buildPuzzle(sid, bidx);
+    setPuzzle(p);
+    setInputs({});
+    setResults({});
     setChecked(false);
     setShowHint(false);
-  }, [blockIndex]);
+  }, [shapeId, blockIndex]);
 
-  useEffect(() => {
-    // Announce the puzzle's center number when a new one appears
-  }, [center]);
+  const handleShapeChange = (sid: string) => {
+    setShapeId(sid);
+    newPuzzle(sid, blockIndex);
+  };
 
   const handleBlockChange = (idx: number) => {
     setBlockIndex(idx);
-    newPuzzle(idx);
+    newPuzzle(shapeId, idx);
   };
 
-  const handleInputChange = (dir: Direction, value: string) => {
+  const handleRandomShape = () => {
+    const options = shapeOrder.filter(s => s !== shapeId);
+    const pick = options[Math.floor(Math.random() * options.length)];
+    handleShapeChange(pick);
+  };
+
+  const handleInputChange = (key: string, value: string) => {
     if (value !== '' && !/^\d{1,4}$/.test(value)) return;
-    setInputs(prev => ({ ...prev, [dir]: value }));
+    setInputs(prev => ({ ...prev, [key]: value }));
   };
 
-  const focusNext = (dir: Direction) => {
-    const order: Direction[] = ['up', 'left', 'right', 'down'];
-    const idx = order.indexOf(dir);
-    const next = order[(idx + 1) % order.length];
-    inputRefs.current[next]?.focus();
-  };
+  const fillableKeys = useMemo(
+    () => puzzle.onKeys.filter(k => k !== puzzle.givenKey),
+    [puzzle]
+  );
+
+  const allFilled = fillableKeys.every(k => inputs[k] && inputs[k] !== '');
 
   const checkAnswers = () => {
-    const newResults: Record<Direction, CellResult> = { up: { status: 'empty' }, down: { status: 'empty' }, left: { status: 'empty' }, right: { status: 'empty' } };
+    const newResults: Record<string, 'empty' | 'correct' | 'wrong'> = {};
     let allCorrect = true;
-    (Object.keys(answers) as Direction[]).forEach(dir => {
-      const val = parseInt(inputs[dir], 10);
-      const correct = val === answers[dir];
-      newResults[dir] = { status: inputs[dir] === '' ? 'wrong' : (correct ? 'correct' : 'wrong') };
+    fillableKeys.forEach(key => {
+      const val = parseInt(inputs[key] ?? '', 10);
+      const correct = val === puzzle.values[key];
+      newResults[key] = inputs[key] ? (correct ? 'correct' : 'wrong') : 'wrong';
       if (!correct) allCorrect = false;
     });
     setResults(newResults);
@@ -114,7 +180,7 @@ export default function NumberPuzzle() {
       setScore(s => s + 10);
       setStreak(s => s + 1);
       setShowCelebration(true);
-      speak('Great job! You got it right!');
+      speak('Great job! You completed the shape!');
       setTimeout(() => setShowCelebration(false), 1800);
       setTimeout(() => newPuzzle(), 1600);
     } else {
@@ -123,19 +189,17 @@ export default function NumberPuzzle() {
     }
   };
 
-  const allFilled = Object.values(inputs).every(v => v !== '');
-
-  const cellClasses = (dir: Direction) => {
-    const r = results[dir];
-    if (!checked || r.status === 'empty' && !checked) {
-      return 'border-purple-300 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-300';
-    }
-    if (r.status === 'correct') return 'border-green-500 bg-green-50 text-green-700';
-    if (r.status === 'wrong') return 'border-red-400 bg-red-50 text-red-600';
+  const cellClasses = (key: string) => {
+    const r = results[key];
+    if (!checked) return 'border-purple-300 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-300';
+    if (r === 'correct') return 'border-green-500 bg-green-50 text-green-700';
+    if (r === 'wrong') return 'border-red-400 bg-red-50 text-red-600';
     return 'border-purple-300 bg-white';
   };
 
   const currentBlock = blocks[blockIndex];
+  const cellSize = puzzle.cols <= 3 ? 'w-16 h-16 md:w-20 md:h-20' : 'w-11 h-11 md:w-14 md:h-14';
+  const fontSize = puzzle.cols <= 3 ? 'text-xl md:text-2xl' : 'text-xs md:text-base';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 relative overflow-hidden">
@@ -183,7 +247,7 @@ export default function NumberPuzzle() {
 
             <h1 className="text-lg md:text-2xl font-bold text-gray-800 text-center flex-1 flex items-center justify-center gap-2">
               <PuzzleIcon className="w-6 h-6 text-purple-500" />
-              Number Cross Puzzle
+              Number Shape Puzzle
             </h1>
 
             <button
@@ -197,6 +261,37 @@ export default function NumberPuzzle() {
       </div>
 
       <div className="container mx-auto px-4 py-6">
+        {/* Shape selector */}
+        <div className="mb-4">
+          <p className="text-center text-sm font-bold text-gray-500 mb-2">Choose a Shape</p>
+          <div className="flex flex-wrap gap-2 justify-center max-w-3xl mx-auto">
+            {shapeOrder.map(sid => (
+              <motion.button
+                key={sid}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleShapeChange(sid)}
+                className={`w-10 h-10 rounded-xl font-bold text-sm flex items-center justify-center transition-all ${
+                  shapeId === sid
+                    ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg scale-110'
+                    : 'bg-white/70 text-gray-700 hover:bg-white'
+                }`}
+              >
+                {sid === 'CROSS' ? '➕' : sid}
+              </motion.button>
+            ))}
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleRandomShape}
+              className="w-10 h-10 rounded-xl bg-yellow-100 text-yellow-700 flex items-center justify-center shadow hover:shadow-lg transition-all"
+              title="Random shape"
+            >
+              <Shuffle className="w-5 h-5" />
+            </motion.button>
+          </div>
+        </div>
+
         {/* Block selector */}
         <div className="flex flex-wrap gap-2 justify-center mb-6">
           {blocks.map((b, idx) => (
@@ -245,8 +340,9 @@ export default function NumberPuzzle() {
               className="max-w-md mx-auto mb-6 overflow-hidden"
             >
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-4 text-center text-gray-700">
-                <p className="mb-1">⬆️ <b>Up</b> = 10 less &nbsp; ⬇️ <b>Down</b> = 10 more</p>
-                <p>⬅️ <b>Left</b> = 1 less &nbsp; ➡️ <b>Right</b> = 1 more</p>
+                <p className="mb-1">➡️ Moving <b>one square right</b> = add 1</p>
+                <p className="mb-1">⬇️ Moving <b>one square down</b> = add 10</p>
+                <p>Combine both to solve diagonal squares — just like a real number chart!</p>
               </div>
             </motion.div>
           )}
@@ -254,103 +350,52 @@ export default function NumberPuzzle() {
 
         {/* Puzzle grid */}
         <motion.div
-          key={center}
-          initial={{ opacity: 0, scale: 0.8 }}
+          key={puzzle.givenKey + shapeId + blockIndex + JSON.stringify(puzzle.values)}
+          initial={{ opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ type: 'spring', stiffness: 150 }}
-          className="max-w-sm mx-auto"
+          className="flex justify-center"
         >
           <div
-            className="grid grid-cols-3 gap-3"
-            style={{ gridTemplateRows: 'repeat(3, 1fr)' }}
+            className="inline-grid gap-1.5 md:gap-2 bg-white/40 p-3 md:p-4 rounded-3xl shadow-xl"
+            style={{
+              gridTemplateColumns: `repeat(${puzzle.cols}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${puzzle.rows}, minmax(0, 1fr))`,
+            }}
           >
-            {/* row 1 */}
-            <div />
-            <PuzzleCell>
-              <ArrowUp className="w-4 h-4 text-purple-400 mb-1" />
-              <input
-                ref={el => { inputRefs.current.up = el; }}
-                type="text"
-                inputMode="numeric"
-                value={inputs.up}
-                onChange={e => handleInputChange('up', e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && focusNext('up')}
-                className={`w-full text-center text-lg md:text-xl font-bold rounded-xl border-2 py-2 outline-none transition-all ${cellClasses('up')}`}
-                placeholder="?"
-              />
-            </PuzzleCell>
-            <div />
-
-            {/* row 2 */}
-            <PuzzleCell>
-              <ArrowLeft className="w-4 h-4 text-purple-400 mb-1" />
-              <input
-                ref={el => { inputRefs.current.left = el; }}
-                type="text"
-                inputMode="numeric"
-                value={inputs.left}
-                onChange={e => handleInputChange('left', e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && focusNext('left')}
-                className={`w-full text-center text-lg md:text-xl font-bold rounded-xl border-2 py-2 outline-none transition-all ${cellClasses('left')}`}
-                placeholder="?"
-              />
-            </PuzzleCell>
-
-            <div className="aspect-square rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-xl">
-              <span className="text-2xl md:text-3xl font-black text-white drop-shadow-lg">{center}</span>
-            </div>
-
-            <PuzzleCell>
-              <ArrowRight className="w-4 h-4 text-purple-400 mb-1" />
-              <input
-                ref={el => { inputRefs.current.right = el; }}
-                type="text"
-                inputMode="numeric"
-                value={inputs.right}
-                onChange={e => handleInputChange('right', e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && focusNext('right')}
-                className={`w-full text-center text-lg md:text-xl font-bold rounded-xl border-2 py-2 outline-none transition-all ${cellClasses('right')}`}
-                placeholder="?"
-              />
-            </PuzzleCell>
-
-            {/* row 3 */}
-            <div />
-            <PuzzleCell>
-              <ArrowDown className="w-4 h-4 text-purple-400 mb-1" />
-              <input
-                ref={el => { inputRefs.current.down = el; }}
-                type="text"
-                inputMode="numeric"
-                value={inputs.down}
-                onChange={e => handleInputChange('down', e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && checkAnswers()}
-                className={`w-full text-center text-lg md:text-xl font-bold rounded-xl border-2 py-2 outline-none transition-all ${cellClasses('down')}`}
-                placeholder="?"
-              />
-            </PuzzleCell>
-            <div />
+            {puzzle.bitmap.map((rowStr, r) =>
+              rowStr.split('').map((bit, c) => {
+                const key = `${r}-${c}`;
+                if (bit !== '1') {
+                  return <div key={key} className={cellSize} />;
+                }
+                if (key === puzzle.givenKey) {
+                  return (
+                    <div
+                      key={key}
+                      className={`${cellSize} rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg`}
+                    >
+                      <span className={`${fontSize} font-black text-white drop-shadow-lg`}>
+                        {puzzle.values[key]}
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <input
+                    key={key}
+                    type="text"
+                    inputMode="numeric"
+                    value={inputs[key] || ''}
+                    onChange={e => handleInputChange(key, e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && allFilled && checkAnswers()}
+                    className={`${cellSize} ${fontSize} text-center font-bold rounded-xl border-2 outline-none transition-all ${cellClasses(key)}`}
+                    placeholder="?"
+                  />
+                );
+              })
+            )}
           </div>
-
-          {/* Feedback icons */}
-          {checked && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="grid grid-cols-4 gap-2 mt-3 text-center"
-            >
-              {(['up', 'left', 'right', 'down'] as Direction[]).map(dir => (
-                <div key={dir} className="flex items-center justify-center gap-1 text-sm">
-                  {results[dir].status === 'correct' ? (
-                    <Check className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <X className="w-4 h-4 text-red-500" />
-                  )}
-                  <span className="capitalize text-gray-500">{dir}</span>
-                </div>
-              ))}
-            </motion.div>
-          )}
         </motion.div>
 
         {/* Action buttons */}
@@ -377,7 +422,7 @@ export default function NumberPuzzle() {
           </motion.button>
         </div>
 
-        {checked && !Object.values(results).every(r => r.status === 'correct') && (
+        {checked && Object.values(results).some(r => r !== 'correct') && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -388,17 +433,10 @@ export default function NumberPuzzle() {
         )}
 
         <div className="text-center mt-6 text-gray-500 text-sm">
-          Attempts: {attempts} &nbsp;•&nbsp; Practicing block: <b>{currentBlock.label}</b>
+          Attempts: {attempts} &nbsp;•&nbsp; Shape: <b>{shapeId === 'CROSS' ? 'Plus' : `Letter ${shapeId}`}</b>
+          &nbsp;•&nbsp; Practicing block: <b>{currentBlock.label}</b>
         </div>
       </div>
-    </div>
-  );
-}
-
-function PuzzleCell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col items-center justify-center">
-      {children}
     </div>
   );
 }
